@@ -8,6 +8,7 @@ return table.freeze({
 	SettlingDuration = 3,
 	ResultDuration = 2,
 	AnimationTimeout = 12,
+	SmashActivationDelay = 1,
 	SmashRagdollDuration = 2.5,
 	PusherDelay = 0.16,
 	PusherTravelDuration = 0.3,

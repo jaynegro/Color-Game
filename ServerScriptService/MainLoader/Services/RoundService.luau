@@ -79,9 +79,7 @@ function RoundService.Init(config, network, diceService, tableService, roundDisp
 		PusherService = pusherService,
 		RagdollTriggerService = ragdollTriggerService,
 		AnimationUtil = AnimationUtil,
-		NpcActivator = machine:WaitForChild("NpcActivator"),
 		RollerModel = machine:WaitForChild("RollerModel"),
-		SmashAnimation = animations:WaitForChild("Smash") :: Animation,
 		RollAnimation = animations:WaitForChild("Roll") :: Animation,
 		RoundId = 0,
 	}
