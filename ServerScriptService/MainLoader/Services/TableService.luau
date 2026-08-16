@@ -88,6 +88,11 @@ local function assignSeat(seat: Seat, board: Instance, player: Player, humanoid:
 	network.FireAll("BoardVisibility", board, true)
 	network.FireClient(player, "SeatAssigned", session.Id, board)
 	network.FireClient(player, "Picking", pickingOpen, currentRoundId)
+	task.delay(config.SeatLockDuration, function()
+		if playerSessions[player] == session and session.Humanoid.Parent and session.Humanoid.Health > 0 then
+			network.FireClient(player, "SeatLockEnded", session.Id)
+		end
+	end)
 	if pickingOpen and tryAutoPick then
 		tryAutoPick(session)
 	end

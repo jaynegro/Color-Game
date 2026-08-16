@@ -9,6 +9,7 @@ local LivePickingController = require(controllers:WaitForChild("LivePickingContr
 local LeaderboardController = require(controllers:WaitForChild("LeaderboardController"))
 local LeaderboardDummyController = require(controllers:WaitForChild("LeaderboardDummyController"))
 local MusicController = require(controllers:WaitForChild("MusicController"))
+local MobileJumpController = require(controllers:WaitForChild("MobileJumpController"))
 local NotificationController = require(controllers:WaitForChild("NotificationController"))
 local ResultBoardController = require(controllers:WaitForChild("ResultBoardController"))
 local ResultPopupController = require(controllers:WaitForChild("ResultPopupController"))
@@ -17,6 +18,7 @@ local TopbarCameraController = require(controllers:WaitForChild("TopbarCameraCon
 local WinDropController = require(controllers:WaitForChild("WinDropController"))
 
 NotificationController.Init()
+MobileJumpController.Init()
 BoardController.Init()
 GamePassController.Init()
 HUDController.Init()
