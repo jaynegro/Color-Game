@@ -1,5 +1,4 @@
 --!strict
-wait(3)
 local controllers = script.Parent:WaitForChild("Controllers")
 
 local BoardController = require(controllers:WaitForChild("BoardController"))
@@ -10,19 +9,19 @@ local LivePickingController = require(controllers:WaitForChild("LivePickingContr
 local LeaderboardController = require(controllers:WaitForChild("LeaderboardController"))
 local LeaderboardDummyController = require(controllers:WaitForChild("LeaderboardDummyController"))
 local MusicController = require(controllers:WaitForChild("MusicController"))
-local MobileJumpController = require(controllers:WaitForChild("MobileJumpController"))
 local NpcAnimationController = require(controllers:WaitForChild("NpcAnimationController"))
 local NotificationController = require(controllers:WaitForChild("NotificationController"))
 local ResultBoardController = require(controllers:WaitForChild("ResultBoardController"))
 local ResultPopupController = require(controllers:WaitForChild("ResultPopupController"))
+local SettingsController = require(controllers:WaitForChild("SettingsController"))
 local SoundController = require(controllers:WaitForChild("SoundController"))
 local TopbarCameraController = require(controllers:WaitForChild("TopbarCameraController"))
 local WinDropController = require(controllers:WaitForChild("WinDropController"))
 
 NotificationController.Init()
-MobileJumpController.Init()
 CameraShakeController.Init()
 NpcAnimationController.Init()
+SettingsController.Init()
 BoardController.Init()
 GamePassController.Init()
 HUDController.Init()
