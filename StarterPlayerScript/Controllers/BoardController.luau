@@ -85,6 +85,7 @@ local player = Players.LocalPlayer
 local remote: any
 local tablesFolder: Instance
 local sessionId: string? = nil
+local roundState: string = ""
 local activeBoard: Instance? = nil
 local selectedPart: BasePart? = nil
 local protectionPart: BasePart? = nil
@@ -340,6 +341,14 @@ local function setPanelOpen(isOpen: boolean, animate: boolean)
 	end
 end
 
+local function panelShouldBeOpen(): boolean
+	return sessionId ~= nil and roundState == "Picking"
+end
+
+local function syncPanelToState(animate: boolean)
+	setPanelOpen(panelShouldBeOpen(), animate)
+end
+
 local function toggleDiceBoard()
 	if sessionId then
 		setPanelOpen(not panelIsOpen, true)
@@ -533,7 +542,7 @@ local function setupDiceBoardUi()
 		)
 	end
 
-	setPanelOpen(sessionId ~= nil, false)
+	syncPanelToState(false)
 	renderUiSelection()
 end
 
@@ -801,7 +810,7 @@ local function onServerEvent(action: string, ...: any)
 		sessionId = args[1]
 		activeBoard = assignedBoard
 		if not wasSeated then
-			setPanelOpen(true, true)
+			syncPanelToState(true)
 		end
 		if activeBoard and not visibleBoards[activeBoard] then
 			visibleBoards[activeBoard] = true
@@ -813,7 +822,7 @@ local function onServerEvent(action: string, ...: any)
 			resetProtection()
 			sessionId = nil
 			activeBoard = nil
-			setPanelOpen(false, true)
+			syncPanelToState(true)
 		end
 	elseif action == "Selection" then
 		setSelection(args[1], args[2] == true, args[3])
@@ -864,6 +873,17 @@ function BoardController.Init()
 			task.defer(hidePart, descendant :: BasePart)
 		end
 	end)
+
+	local stateFolder = ReplicatedStorage:WaitForChild("ColorGameState")
+	local function updateRoundState()
+		local newState = stateFolder:GetAttribute("State") or ""
+		if newState ~= roundState then
+			roundState = newState
+			syncPanelToState(true)
+		end
+	end
+	stateFolder:GetAttributeChangedSignal("State"):Connect(updateRoundState)
+	updateRoundState()
 
 	remote = Remote.New("ColorGameEvent")
 	remote.OnClientEvent:Connect(onServerEvent)

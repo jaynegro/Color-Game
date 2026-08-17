@@ -1,4 +1,6 @@
 --!strict
+
+task.wait(3)
 local controllers = script.Parent:WaitForChild("Controllers")
 
 local AFKController = require(controllers:WaitForChild("AFKController"))
