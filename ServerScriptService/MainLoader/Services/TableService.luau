@@ -264,9 +264,6 @@ local function guardVIPSeatTouch(seat: Seat, touchedPart: BasePart)
 		return
 	end
 	vipTouchDebounce[humanoid] = now
-	local occupant = seat.Occupant
-	local occupantName = if occupant and occupant.Parent then occupant.Parent.Name else "nil"
-	warn(`[ColorGame][Debug] guardVIPSeatTouch ejecting {player.Name} from {seat:GetFullName()}, HumanoidState={humanoid:GetState()}, seat.Occupant={occupantName}`)
 	ejectFromVIPSeat(seat, player, humanoid)
 	promptVIPPurchase(player)
 end
@@ -274,8 +271,11 @@ end
 local function setCharacterVIPCollision(player: Player, character: Model)
 	local collisionGroup = if player:GetAttribute("IsVIP") == true then "Default" else NON_VIP_CHARACTER_GROUP
 	for _, descendant in character:GetDescendants() do
-		if descendant:IsA("BasePart") and descendant.Name ~= "RagdollCollider"
-			and (collisionGroup == NON_VIP_CHARACTER_GROUP or descendant.CollisionGroup == NON_VIP_CHARACTER_GROUP) then
+		if
+			descendant:IsA("BasePart")
+			and descendant.Name ~= "RagdollCollider"
+			and (collisionGroup == NON_VIP_CHARACTER_GROUP or descendant.CollisionGroup == NON_VIP_CHARACTER_GROUP)
+		then
 			descendant.CollisionGroup = collisionGroup
 		end
 	end
@@ -288,8 +288,11 @@ local function bindVIPCharacter(player: Player, character: Model)
 	end
 	setCharacterVIPCollision(player, character)
 	vipCharacterConnections[player] = character.DescendantAdded:Connect(function(descendant)
-		if descendant:IsA("BasePart") and descendant.Name ~= "RagdollCollider"
-			and player:GetAttribute("IsVIP") ~= true then
+		if
+			descendant:IsA("BasePart")
+			and descendant.Name ~= "RagdollCollider"
+			and player:GetAttribute("IsVIP") ~= true
+		then
 			descendant.CollisionGroup = NON_VIP_CHARACTER_GROUP
 		end
 	end)
@@ -316,22 +319,20 @@ end
 local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isVIP: boolean)
 	local humanoid = seat.Occupant
 	local existing = seatSessions[seat]
-	local occupantCharacterName = if humanoid and humanoid.Parent then humanoid.Parent.Name else "nil"
-	warn(`[ColorGame][Debug] onSeatChanged seat={seat:GetFullName()} isVIP={isVIP} occupant={occupantCharacterName} existing={existing ~= nil}`)
 	if existing and humanoid == existing.Humanoid then
-		warn(`[ColorGame][Debug]   -> same occupant as existing session, no-op`)
 		return
 	end
-	if existing and not humanoid and os.clock() < existing.LockedUntil
-		and existing.Humanoid.Health > 0 and existing.Humanoid:IsDescendantOf(workspace) then
-		warn(`[ColorGame][Debug]   -> sticky-reseat armed for {existing.Player.Name}, LockedUntil in {existing.LockedUntil - os.clock()}s`)
+	if
+		existing
+		and not humanoid
+		and os.clock() < existing.LockedUntil
+		and existing.Humanoid.Health > 0
+		and existing.Humanoid:IsDescendantOf(workspace)
+	then
 		task.defer(function()
 			if seat.Occupant == nil and seatSessions[seat] == existing and os.clock() < existing.LockedUntil then
-				warn(`[ColorGame][Debug]   -> sticky-reseat FIRING for {existing.Player.Name} on {seat:GetFullName()} (humanoid current seat occupant elsewhere? checking) HumanoidState={existing.Humanoid:GetState()}`)
 				existing.Humanoid.Sit = true
 				seat:Sit(existing.Humanoid)
-			else
-				warn(`[ColorGame][Debug]   -> sticky-reseat SKIPPED (conditions no longer met) for {existing.Player.Name}`)
 			end
 		end)
 		return
@@ -339,7 +340,6 @@ local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isV
 
 	releaseSeat(seat)
 	if not humanoid then
-		warn(`[ColorGame][Debug]   -> no humanoid, seat now empty`)
 		return
 	end
 	local player = Players:GetPlayerFromCharacter(humanoid.Parent)
@@ -359,22 +359,18 @@ local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isV
 			vipChecks[seat] = nil
 		end
 		if seat.Occupant ~= humanoid then
-			warn(`[ColorGame][Debug]   -> VIP check resolved but occupant changed already, aborting for {player.Name}`)
 			return
 		end
 		if not ok or allowed ~= true then
 			if not ok then
 				warn(`[ColorGame] VIP access check failed for {player.Name}: {allowed}`)
 			end
-			warn(`[ColorGame][Debug]   -> VIP denied for {player.Name}, HumanoidState before eject={humanoid:GetState()}`)
 			ejectFromVIPSeat(seat, player, humanoid)
 			promptVIPPurchase(player)
-			warn(`[ColorGame][Debug]   -> VIP eject done for {player.Name}, HumanoidState after eject={humanoid:GetState()}`)
 			return
 		end
 	end
 
-	warn(`[ColorGame][Debug]   -> assignSeat for {player.Name} on {seat:GetFullName()}`)
 	assignSeat(seat, board, tableModel, player, humanoid)
 end
 
@@ -440,8 +436,12 @@ local function handleSelection(player: Player, sessionId: any, requested: any)
 	lastRequestAt[player] = now
 	local session = playerSessions[player]
 	local occupant = session and session.Seat.Occupant
-	if not session or session.Id ~= sessionId or not occupant
-		or Players:GetPlayerFromCharacter(occupant.Parent) ~= player then
+	if
+		not session
+		or session.Id ~= sessionId
+		or not occupant
+		or Players:GetPlayerFromCharacter(occupant.Parent) ~= player
+	then
 		network.FireClient(player, "Notice", "Your table seat session expired. Please sit again.")
 		return
 	end
@@ -524,13 +524,19 @@ function TableService.Init(gameConfig, networkService, playerDataManager, availa
 						local typedSeat = seat :: Seat
 						if isVIP then
 							typedSeat.CollisionGroup = VIP_SEAT_GROUP
-							table.insert(seatConnections, typedSeat.Touched:Connect(function(touchedPart)
-								guardVIPSeatTouch(typedSeat, touchedPart)
-							end))
+							table.insert(
+								seatConnections,
+								typedSeat.Touched:Connect(function(touchedPart)
+									guardVIPSeatTouch(typedSeat, touchedPart)
+								end)
+							)
 						end
-						table.insert(seatConnections, typedSeat:GetPropertyChangedSignal("Occupant"):Connect(function()
-							onSeatChanged(typedSeat, board, tableModel, isVIP)
-						end))
+						table.insert(
+							seatConnections,
+							typedSeat:GetPropertyChangedSignal("Occupant"):Connect(function()
+								onSeatChanged(typedSeat, board, tableModel, isVIP)
+							end)
+						)
 						if typedSeat.Occupant then
 							task.defer(onSeatChanged, typedSeat, board, tableModel, isVIP)
 						end
@@ -556,7 +562,13 @@ function TableService.Init(gameConfig, networkService, playerDataManager, availa
 				network.FireClient(player, "SeatAssigned", session.Id, session.Board)
 				network.FireClient(player, "Picking", pickingOpen, currentRoundId)
 				if session.Choice then
-					network.FireClient(player, "Selection", session.Choice, session.RainbowLocked, session.DisplayChoice)
+					network.FireClient(
+						player,
+						"Selection",
+						session.Choice,
+						session.RainbowLocked,
+						session.DisplayChoice
+					)
 				end
 				if session.ProtectionActive then
 					network.FireClient(player, "Protection", true)
@@ -634,16 +646,26 @@ end
 
 function TableService.OnRainbowGranted(player: Player)
 	local session = playerSessions[player]
-	if pickingOpen and session and not session.RainbowLocked and not session.ProtectionActive
-		and dataManager.ConsumeRainbowCredit(player) then
+	if
+		pickingOpen
+		and session
+		and not session.RainbowLocked
+		and not session.ProtectionActive
+		and dataManager.ConsumeRainbowCredit(player)
+	then
 		selectChoice(session, "Rainbow", true)
 	end
 end
 
 function TableService.OnStreakProtectionGranted(player: Player)
 	local session = playerSessions[player]
-	if pickingOpen and session and not session.RainbowLocked and not session.ProtectionActive
-		and dataManager.ConsumeStreakProtectionCredit(player) then
+	if
+		pickingOpen
+		and session
+		and not session.RainbowLocked
+		and not session.ProtectionActive
+		and dataManager.ConsumeStreakProtectionCredit(player)
+	then
 		session.ProtectionActive = true
 		session.RoundId = currentRoundId
 		network.FireClient(player, "Protection", true)
@@ -708,20 +730,17 @@ function TableService.Resolve(results: { string })
 	for player, session in playerSessions do
 		if session.RoundId == currentRoundId and session.Choice then
 			summary[session.Choice] = (summary[session.Choice] or 0) + 1
-			local matchedDice = if session.RainbowLocked
-				then 3
-				else resultCounts[string.lower(session.Choice)] or 0
+			local matchedDice = if session.RainbowLocked then 3 else resultCounts[string.lower(session.Choice)] or 0
 			local won = matchedDice > 0
 			if duelService and duelService.IsActive(player) then
 				duelOutcomes[player] = { Matches = matchedDice }
 				if matchedDice >= 2 then
-					local effectPlayed, effectProblem = BoardResultEffectService.Play(
-						session.Board,
-						session.Choice,
-						math.min(matchedDice, 3)
-					)
+					local effectPlayed, effectProblem =
+						BoardResultEffectService.Play(session.Board, session.Choice, math.min(matchedDice, 3))
 					if not effectPlayed then
-						warn(`[ColorGame] Could not play duel {matchedDice}x board effect for {player.Name}: {effectProblem}`)
+						warn(
+							`[ColorGame] Could not play duel {matchedDice}x board effect for {player.Name}: {effectProblem}`
+						)
 					end
 				end
 				continue
@@ -736,13 +755,12 @@ function TableService.Resolve(results: { string })
 					network.FireClient(player, "CoinEarned", earnedCoins, newStreak)
 				end
 				if matchedDice >= 2 then
-					local effectPlayed, effectProblem = BoardResultEffectService.Play(
-						session.Board,
-						session.Choice,
-						math.min(matchedDice, 3)
-					)
+					local effectPlayed, effectProblem =
+						BoardResultEffectService.Play(session.Board, session.Choice, math.min(matchedDice, 3))
 					if not effectPlayed then
-						warn(`[ColorGame] Could not play {matchedDice}x board effect for {player.Name}: {effectProblem}`)
+						warn(
+							`[ColorGame] Could not play {matchedDice}x board effect for {player.Name}: {effectProblem}`
+						)
 					end
 				end
 				table.insert(winners, {
