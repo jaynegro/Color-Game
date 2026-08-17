@@ -238,6 +238,7 @@ local function finishDuel(duel: Duel, winner: Player?, reason: string)
 
 	if winner then
 		local awarded, newRank = dataManager.AwardDuelRank(winner)
+		dataManager.AddWins(winner, 1)
 		if awarded then
 			notify(winner, `You won the duel! Duel Rank: {newRank}.`, "Success")
 		end
