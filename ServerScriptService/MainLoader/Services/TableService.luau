@@ -210,16 +210,18 @@ local function assignSeat(seat: Seat, board: Instance, tableModel: Model, player
 end
 
 local function ejectFromVIPSeat(seat: Seat, player: Player, humanoid: Humanoid)
+	-- Let Roblox release the seat itself (Sit = false handles destroying its
+	-- own SeatWeld and clearing Occupant/seated state atomically). Manually
+	-- destroying SeatWeld first used to race that cleanup and could leave the
+	-- Humanoid stuck thinking it was still seated, blocking it from sitting
+	-- anywhere else until the character respawned.
+	humanoid.Sit = false
+	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+
 	-- Temporarily disable this individual seat so Roblox cannot recreate its
 	-- SeatWeld while the denied character is still touching it.
 	local wasDisabled = seat.Disabled
 	seat.Disabled = true
-	local seatWeld = seat:FindFirstChild("SeatWeld")
-	if seatWeld then
-		seatWeld:Destroy()
-	end
-	humanoid.Sit = false
-	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 
 	local character = humanoid.Parent
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -262,6 +264,9 @@ local function guardVIPSeatTouch(seat: Seat, touchedPart: BasePart)
 		return
 	end
 	vipTouchDebounce[humanoid] = now
+	local occupant = seat.Occupant
+	local occupantName = if occupant and occupant.Parent then occupant.Parent.Name else "nil"
+	warn(`[ColorGame][Debug] guardVIPSeatTouch ejecting {player.Name} from {seat:GetFullName()}, HumanoidState={humanoid:GetState()}, seat.Occupant={occupantName}`)
 	ejectFromVIPSeat(seat, player, humanoid)
 	promptVIPPurchase(player)
 end
@@ -311,15 +316,22 @@ end
 local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isVIP: boolean)
 	local humanoid = seat.Occupant
 	local existing = seatSessions[seat]
+	local occupantCharacterName = if humanoid and humanoid.Parent then humanoid.Parent.Name else "nil"
+	warn(`[ColorGame][Debug] onSeatChanged seat={seat:GetFullName()} isVIP={isVIP} occupant={occupantCharacterName} existing={existing ~= nil}`)
 	if existing and humanoid == existing.Humanoid then
+		warn(`[ColorGame][Debug]   -> same occupant as existing session, no-op`)
 		return
 	end
 	if existing and not humanoid and os.clock() < existing.LockedUntil
 		and existing.Humanoid.Health > 0 and existing.Humanoid:IsDescendantOf(workspace) then
+		warn(`[ColorGame][Debug]   -> sticky-reseat armed for {existing.Player.Name}, LockedUntil in {existing.LockedUntil - os.clock()}s`)
 		task.defer(function()
 			if seat.Occupant == nil and seatSessions[seat] == existing and os.clock() < existing.LockedUntil then
+				warn(`[ColorGame][Debug]   -> sticky-reseat FIRING for {existing.Player.Name} on {seat:GetFullName()} (humanoid current seat occupant elsewhere? checking) HumanoidState={existing.Humanoid:GetState()}`)
 				existing.Humanoid.Sit = true
 				seat:Sit(existing.Humanoid)
+			else
+				warn(`[ColorGame][Debug]   -> sticky-reseat SKIPPED (conditions no longer met) for {existing.Player.Name}`)
 			end
 		end)
 		return
@@ -327,6 +339,7 @@ local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isV
 
 	releaseSeat(seat)
 	if not humanoid then
+		warn(`[ColorGame][Debug]   -> no humanoid, seat now empty`)
 		return
 	end
 	local player = Players:GetPlayerFromCharacter(humanoid.Parent)
@@ -346,18 +359,22 @@ local function onSeatChanged(seat: Seat, board: Instance, tableModel: Model, isV
 			vipChecks[seat] = nil
 		end
 		if seat.Occupant ~= humanoid then
+			warn(`[ColorGame][Debug]   -> VIP check resolved but occupant changed already, aborting for {player.Name}`)
 			return
 		end
 		if not ok or allowed ~= true then
 			if not ok then
 				warn(`[ColorGame] VIP access check failed for {player.Name}: {allowed}`)
 			end
+			warn(`[ColorGame][Debug]   -> VIP denied for {player.Name}, HumanoidState before eject={humanoid:GetState()}`)
 			ejectFromVIPSeat(seat, player, humanoid)
 			promptVIPPurchase(player)
+			warn(`[ColorGame][Debug]   -> VIP eject done for {player.Name}, HumanoidState after eject={humanoid:GetState()}`)
 			return
 		end
 	end
 
+	warn(`[ColorGame][Debug]   -> assignSeat for {player.Name} on {seat:GetFullName()}`)
 	assignSeat(seat, board, tableModel, player, humanoid)
 end
 
