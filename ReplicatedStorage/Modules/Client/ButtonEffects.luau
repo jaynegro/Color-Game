@@ -39,7 +39,8 @@ function ButtonEffects.Bind(button: GuiButton, callback: () -> ())
 	end)
 
 	button.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
 			tweenScale(typedScale, PRESSED_SCALE)
@@ -47,7 +48,8 @@ function ButtonEffects.Bind(button: GuiButton, callback: () -> ())
 	end)
 
 	button.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
 			tweenScale(typedScale, if hovering then HOVER_SCALE else 1)
