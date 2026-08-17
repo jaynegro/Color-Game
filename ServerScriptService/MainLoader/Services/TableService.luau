@@ -249,14 +249,22 @@ local function promptVIPPurchase(player: Player)
 	end
 end
 
+-- VIP seats stay Seat.Disabled = true permanently, which blocks Roblox's
+-- built-in touch/click auto-sit for everyone. Seat:Sit() is the documented
+-- manual override that seats a Humanoid regardless of Disabled, so this is
+-- the only path a Humanoid ever gets seated through on a VIP table - a
+-- non-VIP player is simply never seated in the first place, nothing to eject.
 local function guardVIPSeatTouch(seat: Seat, touchedPart: BasePart)
+	if seat.Occupant then
+		return
+	end
 	local character = touchedPart:FindFirstAncestorOfClass("Model")
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
 	local player = Players:GetPlayerFromCharacter(character)
-	if not player or player:GetAttribute("IsVIP") == true then
+	if not player then
 		return
 	end
 	local now = os.clock()
@@ -264,8 +272,12 @@ local function guardVIPSeatTouch(seat: Seat, touchedPart: BasePart)
 		return
 	end
 	vipTouchDebounce[humanoid] = now
-	ejectFromVIPSeat(seat, player, humanoid)
-	promptVIPPurchase(player)
+	if player:GetAttribute("IsVIP") == true then
+		humanoid.Sit = true
+		seat:Sit(humanoid)
+	else
+		promptVIPPurchase(player)
+	end
 end
 
 local function setCharacterVIPCollision(player: Player, character: Model)
@@ -515,21 +527,22 @@ function TableService.Init(gameConfig, networkService, playerDataManager, availa
 			for _, chair in tableModel:GetChildren() do
 				local index = string.match(chair.Name, "^Chair(%d+)$")
 				if index then
-					if chair:IsA("Model") then
-						registerChairModel(chair)
-					end
 					local seat = chair:FindFirstChildWhichIsA("Seat", true)
 					local board = tableModel:FindFirstChild(`GameBoard{index}`)
 					if seat and board then
 						local typedSeat = seat :: Seat
 						if isVIP then
 							typedSeat.CollisionGroup = VIP_SEAT_GROUP
+							typedSeat.Disabled = true
 							table.insert(
 								seatConnections,
 								typedSeat.Touched:Connect(function(touchedPart)
 									guardVIPSeatTouch(typedSeat, touchedPart)
 								end)
 							)
+						end
+						if chair:IsA("Model") then
+							registerChairModel(chair)
 						end
 						table.insert(
 							seatConnections,
