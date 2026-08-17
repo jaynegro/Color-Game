@@ -7,6 +7,7 @@ function Picking.Run(context)
 	context.TableService.SetPickingOpen(true, context.RoundId)
 	task.wait(context.Config.PickingDuration)
 	context.TableService.SetPickingOpen(false, context.RoundId)
+	context.TableService.SetRoundCameraActive(true)
 	context.RoundDisplayService.ShowRoundInProgress()
 end
 

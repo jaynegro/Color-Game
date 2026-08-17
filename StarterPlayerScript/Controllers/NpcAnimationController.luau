@@ -9,6 +9,36 @@ local NpcAnimationController = {}
 local initialized = false
 local idleTrack: AnimationTrack? = nil
 local smashTrack: AnimationTrack? = nil
+local burst: Instance? = nil
+local burstGeneration = 0
+
+local function setVfxEnabled(root: Instance, enabled: boolean)
+	local function apply(instance: Instance)
+		if instance:IsA("ParticleEmitter") or instance:IsA("Beam") or instance:IsA("Trail")
+			or instance:IsA("Light") then
+			instance.Enabled = enabled
+		end
+	end
+	apply(root)
+	for _, descendant in root:GetDescendants() do
+		apply(descendant)
+	end
+end
+
+local function playBurst()
+	local root = burst
+	if not root or not root.Parent then
+		return
+	end
+	burstGeneration += 1
+	local generation = burstGeneration
+	setVfxEnabled(root, true)
+	task.delay(0.4, function()
+		if burstGeneration == generation and root.Parent then
+			setVfxEnabled(root, false)
+		end
+	end)
+end
 
 local function getAnimator(target: Instance): Animator
 	local existing = target:FindFirstChildWhichIsA("Animator", true)
@@ -68,6 +98,8 @@ function NpcAnimationController.Init()
 	initialized = true
 
 	local machine = workspace:WaitForChild("ScriptableParts"):WaitForChild("Machine")
+	burst = machine:WaitForChild("Burst")
+	setVfxEnabled(burst, false)
 	local npcActivator = machine:WaitForChild("NpcActivator")
 	local animations = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Animations")
 	local idleAnimation = animations:WaitForChild("Idle") :: Animation
@@ -76,6 +108,9 @@ function NpcAnimationController.Init()
 
 	idleTrack = loadTrack(animator, idleAnimation, true, Enum.AnimationPriority.Action)
 	smashTrack = loadTrack(animator, smashAnimation, false, Enum.AnimationPriority.Action2)
+	if smashTrack then
+		smashTrack:GetMarkerReachedSignal("MachineActivated"):Connect(playBurst)
+	end
 	if idleTrack then
 		idleTrack:Play(0.15)
 	end

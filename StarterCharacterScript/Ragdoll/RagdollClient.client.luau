@@ -2,6 +2,12 @@
 
 local Players = game:GetService("Players")
 local ContextActionService = game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Modules.Shared.Config.Config)
+if not Config.RagdollEnabled then
+	return
+end
 
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera

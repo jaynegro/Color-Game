@@ -1,6 +1,12 @@
 --!strict
 
 local PhysicsService = game:GetService("PhysicsService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Modules.Shared.Config.Config)
+if not Config.RagdollEnabled then
+	return
+end
 
 local Character = script.Parent
 local Humanoid = Character:WaitForChild("Humanoid") :: Humanoid

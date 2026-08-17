@@ -154,6 +154,8 @@ function NotificationController.Init()
 		local args = table.pack(...)
 		if action == "Notice" then
 			NotificationController.Notify(tostring(args[1]), "Error")
+		elseif action == "Notify" then
+			NotificationController.Notify(tostring(args[1]), tostring(args[2] or "Warning"))
 		elseif action == "Outcome" then
 			local won = args[1] == true
 			local reward = math.max(0, tonumber(args[2]) or 0)

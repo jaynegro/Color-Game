@@ -18,6 +18,9 @@ local autoPickEnabled: { [Player]: boolean } = {}
 local gamePassPrices: { [string]: number? } = {}
 local lastGamePassActionAt: { [Player]: number } = {}
 local eventConnection: RBXScriptConnection?
+local gamePassPurchased = Instance.new("BindableEvent")
+
+MonetizationService.GamePassPurchased = gamePassPurchased.Event
 
 local function getOffer(groupName: string, offerName: string): Offer?
 	local group = config and config[groupName]
@@ -39,7 +42,10 @@ local function registerProduct(productName: string, handler: (Player, string) ->
 	if productId <= 0 then
 		return
 	end
-	assert(productHandlers[productId] == nil, `Duplicate developer product ID {productId}`)
+	if productHandlers[productId] ~= nil then
+		warn(`[ColorGame] Duplicate developer product ID {productId} for {productName}; keeping the first registration.`)
+		return
+	end
 	productHandlers[productId] = handler
 end
 
@@ -61,6 +67,20 @@ function MonetizationService.PromptProduct(player: Player, productName: string):
 		warn(`[ColorGame] Could not prompt developer product {productName} ({productId}): {problem}`)
 	end
 	return ok
+end
+
+function MonetizationService.GetDeveloperProductPrice(productName: string): number?
+	local productId = MonetizationService.GetDeveloperProductId(productName)
+	if productId <= 0 then
+		return nil
+	end
+	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, productId, Enum.InfoType.Product)
+	if not ok then
+		warn(`[ColorGame] Could not load price for developer product {productName} ({productId}): {info}`)
+		return nil
+	end
+	local price = if type(info.PriceInRobux) == "number" then math.floor(info.PriceInRobux) else nil
+	return price
 end
 
 function MonetizationService.OwnsGamePass(player: Player, gamePassName: string): boolean
@@ -114,10 +134,18 @@ local function getGamePassPrice(gamePassName: string): number?
 	return price
 end
 
+function MonetizationService.GetGamePassPrice(gamePassName: string): number?
+	return getGamePassPrice(gamePassName)
+end
+
 local function sendGamePassState(player: Player, gamePassName: string)
 	local configured = MonetizationService.GetGamePassId(gamePassName) > 0
+	local starterPackOwned = MonetizationService.OwnsGamePass(player, "StarterPack")
 	local owned = if configured then MonetizationService.OwnsGamePass(player, gamePassName) else false
-	local enabled = gamePassName == "AutoPick" and owned and autoPickEnabled[player] == true
+	if gamePassName == "AutoPick" and starterPackOwned then
+		owned = true
+	end
+	local enabled = gamePassName == "AutoPick" and owned and (starterPackOwned or autoPickEnabled[player] == true)
 	local price = if configured and not owned then getGamePassPrice(gamePassName) else nil
 	if gamePassName == "VIP" then
 		player:SetAttribute("IsVIP", owned)
@@ -150,6 +178,46 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 		end
 		return granted
 	end)
+	registerProduct("RemoveAllChairs", function(_player, _purchaseId)
+		tableService.RemoveAllChairsForDuration(10)
+		network.FireAll("Notice", "All chairs removed for 10 seconds.")
+		return true
+	end)
+	registerProduct("Coins49", function(player, _purchaseId)
+		local granted, _ = dataManager.AddCoins(player, 49)
+		if granted then
+			network.FireClient(player, "CoinEarned", 49)
+		end
+		return granted
+	end)
+	registerProduct("Coins299", function(player, _purchaseId)
+		local granted, _ = dataManager.AddCoins(player, 299)
+		if granted then
+			network.FireClient(player, "CoinEarned", 299)
+		end
+		return granted
+	end)
+	registerProduct("Coins599", function(player, _purchaseId)
+		local granted, _ = dataManager.AddCoins(player, 599)
+		if granted then
+			network.FireClient(player, "CoinEarned", 599)
+		end
+		return granted
+	end)
+	registerProduct("Coins999", function(player, _purchaseId)
+		local granted, _ = dataManager.AddCoins(player, 999)
+		if granted then
+			network.FireClient(player, "CoinEarned", 999)
+		end
+		return granted
+	end)
+	registerProduct("Coins1499", function(player, _purchaseId)
+		local granted, _ = dataManager.AddCoins(player, 1499)
+		if granted then
+			network.FireClient(player, "CoinEarned", 1499)
+		end
+		return granted
+	end)
 
 	tableService.SetRainbowPrompt(function(player)
 		if not MonetizationService.PromptProduct(player, "Rainbow") then
@@ -170,13 +238,19 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 		end
 	end)
 	tableService.SetAutoPickChecker(function(player)
-		return autoPickEnabled[player] == true
+		return autoPickEnabled[player] == true or MonetizationService.OwnsGamePass(player, "StarterPack")
 	end)
 
 	local remote = network.Event :: RemoteEvent
 	eventConnection = remote.OnServerEvent:Connect(function(player, action, gamePassName)
 		if action == "MonetizationReady" then
 			task.spawn(sendAllGamePassStates, player)
+			return
+		end
+		if action == "ShopProductAction" and type(gamePassName) == "string" then
+			if not MonetizationService.PromptProduct(player, gamePassName) then
+				network.FireClient(player, "Notice", `{gamePassName} is not configured yet.`)
+			end
 			return
 		end
 		if action ~= "GamePassAction" or type(gamePassName) ~= "string"
@@ -189,6 +263,7 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 		end
 		lastGamePassActionAt[player] = now
 		task.spawn(function()
+			local starterPackOwned = MonetizationService.OwnsGamePass(player, "StarterPack")
 			if not MonetizationService.OwnsGamePass(player, gamePassName) then
 				if not MonetizationService.PromptGamePass(player, gamePassName) then
 					network.FireClient(player, "Notice", `{gamePassName} Game Pass is not configured yet.`)
@@ -196,9 +271,13 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 				return
 			end
 			if gamePassName == "AutoPick" then
-				autoPickEnabled[player] = not (autoPickEnabled[player] == true)
+				if starterPackOwned then
+					autoPickEnabled[player] = true
+				else
+					autoPickEnabled[player] = not (autoPickEnabled[player] == true)
+				end
 				sendGamePassState(player, gamePassName)
-				if autoPickEnabled[player] then
+				if autoPickEnabled[player] or starterPackOwned then
 					tableService.OnAutoPickEnabled(player)
 				end
 			else
@@ -218,9 +297,17 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 				playerCache[gamePassName] = true
 				if gamePassName == "VIP" then
 					player:SetAttribute("IsVIP", true)
+				elseif gamePassName == "StarterPack" then
+					dataManager.AddCoins(player, 250)
+					autoPickEnabled[player] = true
 				end
 				autoPickEnabled[player] = if gamePassName == "AutoPick" then false else autoPickEnabled[player]
+				if gamePassName == "StarterPack" then
+					network.FireClient(player, "CoinEarned", 250)
+				end
 				task.defer(sendGamePassState, player, gamePassName)
+				network.FireClient(player, "PurchaseSuccess", "GamePass", gamePassName)
+				gamePassPurchased:Fire(player, gamePassName)
 				break
 			end
 		end
@@ -253,6 +340,7 @@ function MonetizationService.Init(monetizationConfig, dataManager, tableService,
 		end
 		local ok, granted = pcall(handler, player, tostring(receiptInfo.PurchaseId))
 		if ok and granted then
+			network.FireClient(player, "PurchaseSuccess", "DeveloperProduct", receiptInfo.ProductId)
 			return Enum.ProductPurchaseDecision.PurchaseGranted
 		end
 		if not ok then

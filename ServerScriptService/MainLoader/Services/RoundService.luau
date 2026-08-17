@@ -97,6 +97,7 @@ function RoundService.Start()
 				warn(`[ColorGame] Round failed:\n{message}`)
 				context.DiceService.SetImpactSoundsActive(false)
 				context.TableService.SetPickingOpen(false, context.RoundId)
+				context.TableService.SetRoundCameraActive(false)
 				setState("Recovering", 2)
 				task.wait(2)
 			end

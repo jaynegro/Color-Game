@@ -103,7 +103,9 @@ local function renderDrops(results: any, report: any)
 			if winner then
 				local matchingIndices = {}
 				if winnerInfo.Choice == "Rainbow" then
-					table.insert(matchingIndices, 1)
+					for index = 1, math.min(#results, 3) do
+						table.insert(matchingIndices, index)
+					end
 				else
 					for index, result in results do
 						if string.lower(tostring(result)) == string.lower(tostring(winnerInfo.Choice)) then

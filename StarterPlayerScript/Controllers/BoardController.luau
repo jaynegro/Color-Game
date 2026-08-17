@@ -37,8 +37,9 @@ local UI_BUTTON_CHOICES: { [string]: string } = {
 
 local BUTTON_DEFAULT_COLOR = Color3.fromRGB(235, 231, 220)
 local BUTTON_ACTIVE_COLOR = Color3.fromRGB(57, 255, 87)
-local PANEL_ON_POSITION = UDim2.new(0.035, 0, 0.16, 0)
-local PANEL_OFF_POSITION = UDim2.new(-0.349, 0, 0.16, 0)
+local PANEL_ON_POSITION = UDim2.new(0.003, 0, 0.441, 0)
+local PANEL_OFF_POSITION = UDim2.new(-100, 0, 0.441, 0)
+local PANEL_TWEEN_INFO = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local CHOICE_HEX: { [string]: string } = {
 	Blue = "#145BE8",
 	Green = "#2DC732",
@@ -67,6 +68,18 @@ local RAINBOW_COLORS = {
 	Color3.fromRGB(226, 70, 142),
 }
 local RAINBOW_TWEEN_INFO = TweenInfo.new(1.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+local CHOICE_LABEL_TWEEN_INFO = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local CHOICE_LABEL_BOTTOM_OFFSET = 10
+
+type ChoiceLabelState = {
+	Label: GuiObject,
+	DefaultPosition: UDim2,
+	TextTransparency: { [TextLabel | TextButton]: number },
+	StrokeTransparency: { [TextLabel | TextButton]: number },
+	UIStrokeTransparency: { [UIStroke]: number },
+	Hovering: boolean,
+	Tweens: { Tween },
+}
 
 local player = Players.LocalPlayer
 local remote: any
@@ -82,13 +95,135 @@ local partTweens: { [BasePart]: Tween } = {}
 local rainbowTweens: { [BasePart]: Tween } = {}
 local rainbowGenerations: { [BasePart]: number } = {}
 local uiChoiceButtons: { [string]: GuiButton } = {}
+local choiceLabelStates: { [string]: ChoiceLabelState } = {}
 local selectedChoice: string? = nil
+local selectedUiChoice: string? = nil
 local protectionActive = false
 local diceBoardPanel: GuiObject? = nil
+local diceBoardTween: Tween? = nil
+local leftFrame: GuiObject? = nil
+local leftFrameDefaultPosition: UDim2? = nil
+local leftFrameTween: Tween? = nil
+local panelTweenGeneration = 0
 local pickStatusLabel: TextLabel? = nil
 local panelIsOpen = false
 local lastUiChoice: string? = nil
 local lastUiRequestAt = 0
+local arrowLoopGeneration = 0
+local arrowTweens: { [GuiObject]: { Tween } } = {}
+local arrowDefaultPositions: { [GuiObject]: UDim2 } = {}
+local arrowInstances: { GuiObject } = {}
+
+local ARROW_BOUNCE_INFO_UP = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local ARROW_BOUNCE_INFO_DOWN = TweenInfo.new(0.24, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+local ARROW_BOUNCE_OFFSET = 12
+
+local function choiceIsActive(choice: string): boolean
+	return choice == selectedUiChoice or (choice == "Orange" and protectionActive)
+end
+
+local function cancelChoiceLabelTweens(state: ChoiceLabelState)
+	for _, tween in state.Tweens do
+		tween:Cancel()
+	end
+	table.clear(state.Tweens)
+end
+
+local function setChoiceLabelVisible(choice: string, visible: boolean, animate: boolean)
+	local state = choiceLabelStates[choice]
+	if not state or not state.Label.Parent then
+		return
+	end
+	cancelChoiceLabelTweens(state)
+	local targetPosition = if visible
+		then state.DefaultPosition
+		else state.DefaultPosition + UDim2.fromOffset(0, CHOICE_LABEL_BOTTOM_OFFSET)
+	if not animate then
+		state.Label.Position = targetPosition
+		for textObject, original in state.TextTransparency do
+			textObject.TextTransparency = if visible then original else 1
+			textObject.TextStrokeTransparency = if visible then state.StrokeTransparency[textObject] else 1
+		end
+		for stroke, original in state.UIStrokeTransparency do
+			stroke.Transparency = if visible then original else 1
+		end
+		return
+	end
+
+	local positionTween = TweenService:Create(state.Label, CHOICE_LABEL_TWEEN_INFO, {
+		Position = targetPosition,
+	})
+	table.insert(state.Tweens, positionTween)
+	positionTween:Play()
+	for textObject, original in state.TextTransparency do
+		if textObject.Parent then
+			local tween = TweenService:Create(textObject, CHOICE_LABEL_TWEEN_INFO, {
+				TextTransparency = if visible then original else 1,
+				TextStrokeTransparency = if visible then state.StrokeTransparency[textObject] else 1,
+			})
+			table.insert(state.Tweens, tween)
+			tween:Play()
+		end
+	end
+	for stroke, original in state.UIStrokeTransparency do
+		if stroke.Parent then
+			local tween = TweenService:Create(stroke, CHOICE_LABEL_TWEEN_INFO, {
+				Transparency = if visible then original else 1,
+			})
+			table.insert(state.Tweens, tween)
+			tween:Play()
+		end
+	end
+end
+
+local function setupChoiceLabel(choice: string, button: GuiButton)
+	local label = button:FindFirstChild("Title")
+	if not label or not label:IsA("GuiObject")
+		or not (label:IsA("TextLabel") or label:IsA("TextButton")) then
+		return
+	end
+	local textTransparency: { [TextLabel | TextButton]: number } = {}
+	local strokeTransparency: { [TextLabel | TextButton]: number } = {}
+	local uiStrokeTransparency: { [UIStroke]: number } = {}
+	local textObjects: { TextLabel | TextButton } = { label :: any }
+	for _, descendant in label:GetDescendants() do
+		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+			table.insert(textObjects, descendant)
+		elseif descendant:IsA("UIStroke") then
+			uiStrokeTransparency[descendant] = descendant.Transparency
+		end
+	end
+	for _, textObject in textObjects do
+		textObject.Text = choice
+		textTransparency[textObject] = textObject.TextTransparency
+		strokeTransparency[textObject] = textObject.TextStrokeTransparency
+	end
+	label.Visible = true
+	choiceLabelStates[choice] = {
+		Label = label,
+		DefaultPosition = label.Position,
+		TextTransparency = textTransparency,
+		StrokeTransparency = strokeTransparency,
+		UIStrokeTransparency = uiStrokeTransparency,
+		Hovering = false,
+		Tweens = {},
+	}
+	button.MouseEnter:Connect(function()
+		local state = choiceLabelStates[choice]
+		if state then
+			state.Hovering = true
+			setChoiceLabelVisible(choice, true, true)
+		end
+	end)
+	button.MouseLeave:Connect(function()
+		local state = choiceLabelStates[choice]
+		if state then
+			state.Hovering = false
+			setChoiceLabelVisible(choice, choiceIsActive(choice), true)
+		end
+	end)
+	setChoiceLabelVisible(choice, choiceIsActive(choice), false)
+end
 
 local function richChoice(choice: string): string
 	if choice == "Rainbow" then
@@ -118,11 +253,13 @@ end
 
 local function renderUiSelection()
 	for choice, button in uiChoiceButtons do
-		local isActive = choice == selectedChoice or (choice == "Orange" and protectionActive)
+		local isActive = choiceIsActive(choice)
 		local targetColor = if isActive then BUTTON_ACTIVE_COLOR else BUTTON_DEFAULT_COLOR
 		TweenService:Create(button, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			BackgroundColor3 = targetColor,
 		}):Play()
+		local labelState = choiceLabelStates[choice]
+		setChoiceLabelVisible(choice, isActive or (labelState and labelState.Hovering == true), true)
 	end
 	renderPickStatus()
 end
@@ -155,13 +292,51 @@ local function setPanelOpen(isOpen: boolean, animate: boolean)
 	if not panel then
 		return
 	end
+	panelTweenGeneration += 1
+	local generation = panelTweenGeneration
+	if diceBoardTween then
+		diceBoardTween:Cancel()
+		diceBoardTween = nil
+	end
+	if leftFrameTween then
+		leftFrameTween:Cancel()
+		leftFrameTween = nil
+	end
 	local target = if isOpen then PANEL_ON_POSITION else PANEL_OFF_POSITION
+	local left = leftFrame
+	local leftDefault = leftFrameDefaultPosition
+	if left and leftDefault then
+		local leftTarget = if isOpen
+			then UDim2.new(-1, leftDefault.X.Offset, leftDefault.Y.Scale, leftDefault.Y.Offset)
+			else leftDefault
+		if animate then
+			leftFrameTween = TweenService:Create(left, PANEL_TWEEN_INFO, { Position = leftTarget })
+			leftFrameTween:Play()
+		else
+			left.Position = leftTarget
+		end
+	end
+	if isOpen then
+		panel.Visible = true
+	end
 	if animate then
-		TweenService:Create(panel, TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		local tween = TweenService:Create(panel, PANEL_TWEEN_INFO, {
 			Position = target,
-		}):Play()
+		})
+		diceBoardTween = tween
+		tween.Completed:Connect(function(playbackState)
+			if generation ~= panelTweenGeneration or diceBoardTween ~= tween then
+				return
+			end
+			diceBoardTween = nil
+			if playbackState == Enum.PlaybackState.Completed and not isOpen then
+				panel.Visible = false
+			end
+		end)
+		tween:Play()
 	else
 		panel.Position = target
+		panel.Visible = isOpen
 	end
 end
 
@@ -217,6 +392,96 @@ local function childNames(parent: Instance): string
 	return if #names > 0 then table.concat(names, ", ") else "<none>"
 end
 
+local function offsetPosition(position: UDim2, yOffset: number): UDim2
+	return UDim2.new(position.X.Scale, position.X.Offset + yOffset, position.Y.Scale, position.Y.Offset)
+end
+
+local function cancelArrowTweens(arrow: GuiObject)
+	local tweens = arrowTweens[arrow]
+	if not tweens then
+		return
+	end
+	arrowTweens[arrow] = nil
+	for _, tween in tweens do
+		tween:Cancel()
+	end
+end
+
+local function animateArrowBounce(arrow: GuiObject, generation: number)
+	cancelArrowTweens(arrow)
+	local defaultPosition = arrowDefaultPositions[arrow] or arrow.Position
+	arrowDefaultPositions[arrow] = defaultPosition
+
+	task.spawn(function()
+		while arrow.Parent and generation == arrowLoopGeneration do
+			local upTween = TweenService:Create(arrow, ARROW_BOUNCE_INFO_UP, {
+				Position = offsetPosition(defaultPosition, -ARROW_BOUNCE_OFFSET),
+			})
+			arrowTweens[arrow] = { upTween }
+			upTween:Play()
+			upTween.Completed:Wait()
+			if generation ~= arrowLoopGeneration or not arrow.Parent then
+				break
+			end
+
+			local downTween = TweenService:Create(arrow, ARROW_BOUNCE_INFO_DOWN, {
+				Position = defaultPosition,
+			})
+			arrowTweens[arrow] = { downTween }
+			downTween:Play()
+			downTween.Completed:Wait()
+		end
+		if arrowTweens[arrow] then
+			arrowTweens[arrow] = nil
+		end
+	end)
+end
+
+local function setupArrowBounce(panel: Instance)
+	arrowLoopGeneration += 1
+	local generation = arrowLoopGeneration
+
+	for _, descendant in panel:GetDescendants() do
+		if descendant.Name == "Arrows" and descendant:IsA("GuiObject") then
+			local arrow = descendant :: GuiObject
+			local alreadyTracked = false
+			for _, tracked in arrowInstances do
+				if tracked == arrow then
+					alreadyTracked = true
+					break
+				end
+			end
+			if not alreadyTracked then
+				table.insert(arrowInstances, arrow)
+			end
+			arrowDefaultPositions[arrow] = arrow.Position
+			animateArrowBounce(arrow, generation)
+		end
+	end
+end
+
+local function setArrowsVisible(visible: boolean)
+	if visible then
+		arrowLoopGeneration += 1
+		local generation = arrowLoopGeneration
+		for _, arrow in arrowInstances do
+			if arrow.Parent then
+				arrow.Visible = true
+				animateArrowBounce(arrow, generation)
+			end
+		end
+		return
+	end
+
+	arrowLoopGeneration += 1
+	for _, arrow in arrowInstances do
+		cancelArrowTweens(arrow)
+		if arrow.Parent then
+			arrow.Visible = false
+		end
+	end
+end
+
 local function setupDiceBoardUi()
 	local playerGui = player:WaitForChild("PlayerGui")
 	local mainGui = playerGui:WaitForChild("MainGui", 10)
@@ -234,6 +499,17 @@ local function setupDiceBoardUi()
 		return
 	end
 	diceBoardPanel = panel
+	panel.AnchorPoint = Vector2.new(0, 0.5)
+	setupArrowBounce(panel)
+
+	local hud = playerGui:FindFirstChild("HUD") or playerGui:WaitForChild("HUD", 10)
+	local left = hud and hud:FindFirstChild("Left")
+	if left and left:IsA("GuiObject") then
+		leftFrame = left
+		leftFrameDefaultPosition = left.Position
+	else
+		warn("[ColorGame] PlayerGui.HUD.Left must be a GuiObject for DiceBoard coordination.")
+	end
 	local statusLabel = panel:FindFirstChild("TextLabel")
 	if statusLabel and statusLabel:IsA("TextLabel") then
 		pickStatusLabel = statusLabel
@@ -251,6 +527,7 @@ local function setupDiceBoardUi()
 			candidate.Interactable = true
 			candidate.Selectable = true
 			candidate.BackgroundColor3 = BUTTON_DEFAULT_COLOR
+			setupChoiceLabel(requestedChoice, candidate)
 			ButtonEffects.Bind(candidate, function()
 				requestChoice(requestedChoice)
 			end)
@@ -383,6 +660,8 @@ local function resetSelection()
 	end
 	selectedPart = nil
 	selectedChoice = nil
+	selectedUiChoice = nil
+	setArrowsVisible(true)
 	renderUiSelection()
 end
 
@@ -444,12 +723,14 @@ local function showBoard(board: Instance)
 	end)
 end
 
-local function setSelection(choice: string?, _isLocked: boolean)
+local function setSelection(choice: string?, _isLocked: boolean, displayedChoice: string?)
 	resetSelection()
 	if not choice or not activeBoard then
 		return
 	end
 	selectedChoice = choice
+	selectedUiChoice = displayedChoice or choice
+	setArrowsVisible(false)
 	renderUiSelection()
 	local candidate = activeBoard:FindFirstChild(choice, true)
 	if not candidate or not candidate:IsA("BasePart") or not defaults[candidate] then
@@ -565,7 +846,7 @@ local function onServerEvent(action: string, ...: any)
 			setPanelOpen(false, true)
 		end
 	elseif action == "Selection" then
-		setSelection(args[1], args[2] == true)
+		setSelection(args[1], args[2] == true, args[3])
 	elseif action == "Protection" then
 		setProtection(args[1] == true)
 	elseif action == "BoardVisibility" then

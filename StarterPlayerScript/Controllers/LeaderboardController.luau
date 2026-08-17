@@ -97,6 +97,7 @@ local function render(board: Board, entries: any)
 			local valueText = if board.Kind == "TopTime"
 				then formatTime(value)
 				elseif board.Kind == "TopStreak" then `{math.floor(value)} Streak`
+				elseif board.Kind == "TopRank" then `{math.floor(value)} Rank`
 				else `{math.floor(value)} Wins`
 			setText(row, "ValueLabel", valueText)
 			row.Parent = board.ScrollingFrame
@@ -105,14 +106,14 @@ local function render(board: Board, entries: any)
 	end
 end
 
-local function findBoard(viewWindow: Instance, kind: string, interfaceName: string?): Board?
-	local model = viewWindow:WaitForChild(kind, 10)
+local function findBoard(viewWindow: Instance, modelName: string, kind: string, interfaceName: string?): Board?
+	local model = viewWindow:WaitForChild(modelName, 10)
 	if not model then
-		warn(`[ColorGame] Missing ViewWindow.{kind} leaderboard model`)
+		warn(`[ColorGame] Missing ViewWindow.{modelName} leaderboard model`)
 		return nil
 	end
 
-	local expectedNames = { interfaceName or `${kind}BoardUI`, "Root", "BoardFrame", kind, "ScrollingFrame", "Template" }
+	local expectedNames = { interfaceName or `{modelName}BoardUI`, "Root", "BoardFrame", kind, "ScrollingFrame", "Template" }
 	local current: Instance = model
 	local exactPathValid = false
 	local missingName = ""
@@ -177,9 +178,10 @@ end
 
 function LeaderboardController.Init()
 	local viewWindow = workspace:WaitForChild("ScriptableParts"):WaitForChild("ViewWindow")
-	local topTime = findBoard(viewWindow, "TopTime")
-	local topStreak = findBoard(viewWindow, "TopStreak", "TopTimeBoardUI")
-	local topWins = findBoard(viewWindow, "TopWin")
+	local topTime = findBoard(viewWindow, "TopTime", "TopTime")
+	local topStreak = findBoard(viewWindow, "TopStreak", "TopStreak", "TopTimeBoardUI")
+	local topWins = findBoard(viewWindow, "TopWin", "TopWin")
+	local topRank = findBoard(viewWindow, "Toprank", "TopRank", "TopDuelRankBoardUI")
 	if topTime then
 		boards.TopTime = topTime
 	end
@@ -188,6 +190,9 @@ function LeaderboardController.Init()
 	end
 	if topStreak then
 		boards.TopStreak = topStreak
+	end
+	if topRank then
+		boards.TopRank = topRank
 	end
 
 	local remote = Remote.New("ColorGameEvent")
@@ -203,6 +208,9 @@ function LeaderboardController.Init()
 		end
 		if boards.TopStreak then
 			render(boards.TopStreak, snapshot.TopStreak)
+		end
+		if boards.TopRank then
+			render(boards.TopRank, snapshot.TopRank)
 		end
 	end)
 	remote:FireServer("LeaderboardReady")

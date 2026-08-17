@@ -4,6 +4,7 @@ local Spawn = {}
 
 function Spawn.Run(context)
 	context.DiceService.Clear()
+	context.TableService.SetRoundCameraActive(false)
 	context.PusherService.Reset()
 	context.DiceService.Spawn(
 		context.Config.DiceSpawnAnchorDuration,

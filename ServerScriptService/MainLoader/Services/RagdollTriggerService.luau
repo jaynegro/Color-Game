@@ -2,6 +2,9 @@
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Modules.Shared.Config.Config)
 
 local RagdollTriggerService = {}
 
@@ -60,6 +63,10 @@ local function ragdollCharacter(character: Model, duration: number)
 end
 
 function RagdollTriggerService.Trigger(duration: number): number
+	if not Config.RagdollEnabled then
+		return 0
+	end
+
 	local affectedCharacters: { [Model]: boolean } = {}
 	local overlap = OverlapParams.new()
 	overlap.FilterType = Enum.RaycastFilterType.Exclude

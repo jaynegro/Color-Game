@@ -81,6 +81,8 @@ function SoundController.Init()
 		local args = table.pack(...)
 		if action == "PlaySFX" and type(args[1]) == "string" then
 			playLocal(args[1])
+		elseif action == "PurchaseSuccess" then
+			playLocal(if args[1] == "GamePass" then "Gamepass_Purchase" else "Product_Purchase")
 		elseif action == "Results" then
 			playLocal("Result")
 		end

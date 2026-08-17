@@ -7,7 +7,7 @@ local Remote = require(ReplicatedStorage.Modules.Shared.ReplicaShared.Remote)
 
 local CameraShakeController = {}
 
-local IMPACT_MAGNITUDE = 0.8
+local IMPACT_MAGNITUDE = 1.8
 local IMPACT_ROUGHNESS = 7
 local IMPACT_FADE_IN = 0.03
 local IMPACT_FADE_OUT = 0.38
