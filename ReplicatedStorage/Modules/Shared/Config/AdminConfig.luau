@@ -4,18 +4,21 @@
 -- Admins are automatically hidden from every global leaderboard.
 local ADMIN_WHITELIST = table.freeze({
 	7097830180,
+	3718821959,
 })
 
 -- Use this for non-admin accounts that should also be hidden from every
 -- global leaderboard (test accounts, banned accounts, bots, and so on).
 local LEADERBOARD_BLACKLIST = table.freeze({
 	7097830180,
+	3718821959,
 })
 
 -- Players listed here keep their other data, but their Wins and Coins are
 -- reset to zero every time their profile loads after joining.
 local BALANCE_RESET_BLACKLIST = table.freeze({
 	7097830180,
+	3718821959,
 })
 
 local adminSet: { [number]: boolean } = {}

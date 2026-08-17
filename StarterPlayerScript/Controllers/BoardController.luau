@@ -363,26 +363,6 @@ local function requestChoice(choice: string)
 	remote:FireServer("Select", sessionId, choice)
 end
 
-local function isPointInside(gui: GuiObject, point: Vector2): boolean
-	local position = gui.AbsolutePosition
-	local size = gui.AbsoluteSize
-	return point.X >= position.X and point.X <= position.X + size.X
-		and point.Y >= position.Y and point.Y <= position.Y + size.Y
-end
-
-local function requestUiChoiceAt(point: Vector2): boolean
-	if not panelIsOpen or not sessionId then
-		return false
-	end
-	for choice, button in uiChoiceButtons do
-		if button.Visible and isPointInside(button, point) then
-			requestChoice(choice)
-			return true
-		end
-	end
-	return false
-end
-
 local function childNames(parent: Instance): string
 	local names = {}
 	for _, child in parent:GetChildren() do
@@ -794,21 +774,11 @@ local function selectAtPosition(position: Vector2)
 end
 
 local function onInput(input: InputObject, processed: boolean)
-	if not sessionId then
+	if not sessionId or processed then
 		return
 	end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		local position = UserInputService:GetMouseLocation()
-		if requestUiChoiceAt(position) then
-			return
-		end
-		if not processed then
-			selectAtPosition(position)
-		end
-	elseif input.UserInputType == Enum.UserInputType.Touch then
-		requestUiChoiceAt(Vector2.new(input.Position.X, input.Position.Y))
-	else
-		return
+		selectAtPosition(UserInputService:GetMouseLocation())
 	end
 end
 
