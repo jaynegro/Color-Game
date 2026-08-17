@@ -12,7 +12,7 @@ local CHARACTER_FX_ATTRIBUTE = "ColorGameCharacterFx"
 local dataManager: any
 local template: Instance
 local currentOverheads: { [Player]: Instance } = {}
-local cachedStats: { [Player]: { Wins: number, Streak: number } } = {}
+local cachedStats: { [Player]: { Wins: number, Streak: number, DuelRank: number } } = {}
 local characterConnections: { [Player]: RBXScriptConnection } = {}
 local vipConnections: { [Player]: RBXScriptConnection } = {}
 local topConnections: { [Player]: RBXScriptConnection } = {}
@@ -87,6 +87,7 @@ local function render(player: Player)
 	local stats = cachedStats[player]
 	local wins = if stats then stats.Wins else 0
 	local streak = if stats then stats.Streak else 0
+	local duelRank = if stats then stats.DuelRank else 0
 	local billboard = if overhead:IsA("BillboardGui")
 		then overhead
 		else overhead:FindFirstChildWhichIsA("BillboardGui", true)
@@ -96,6 +97,7 @@ local function render(player: Player)
 	local frames = billboard:FindFirstChild("Frames")
 	local winFrame = frames and frames:FindFirstChild("WinFrame")
 	local streakFrame = frames and frames:FindFirstChild("StreakFrame")
+	local duelFrame = frames and frames:FindFirstChild("DuelFrame")
 	local vipFrame = billboard:FindFirstChild("VIP")
 
 	setText(billboard, "NameLabel", player.DisplayName)
@@ -111,6 +113,16 @@ local function render(player: Player)
 		streakFrame.Visible = streak > 0
 	else
 		warn(`[ColorGame] {billboard:GetFullName()} is missing GuiObject Frames.StreakFrame`)
+	end
+	if duelFrame then
+		setText(duelFrame, "Rank", tostring(duelRank))
+	else
+		warn(`[ColorGame] {billboard:GetFullName()} is missing Frames.DuelFrame`)
+	end
+	if duelFrame and duelFrame:IsA("GuiObject") then
+		duelFrame.Visible = duelRank > 0
+	else
+		warn(`[ColorGame] {billboard:GetFullName()} is missing GuiObject Frames.DuelFrame`)
 	end
 	if vipFrame and vipFrame:IsA("GuiObject") then
 		vipFrame.Visible = player:GetAttribute("IsVIP") == true
@@ -155,8 +167,9 @@ local function attach(player: Player, character: Model)
 	end
 
 	local wins, streak = dataManager.GetStats(player)
+	local duelRank = dataManager.GetDuelRank(player)
 	if wins ~= nil and streak ~= nil then
-		cachedStats[player] = { Wins = wins, Streak = streak }
+		cachedStats[player] = { Wins = wins, Streak = streak, DuelRank = duelRank or 0 }
 	end
 	render(player)
 	refreshCharacterEffects(player)
@@ -184,9 +197,21 @@ function OverheadService.Init(playerDataManager)
 	effectsFolder = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Fx") :: Folder
 
 	dataManager.StatsChanged:Connect(function(player: Player, wins: number, streak: number)
+		local previous = cachedStats[player]
 		cachedStats[player] = {
 			Wins = math.max(0, math.floor(wins)),
 			Streak = math.max(0, math.floor(streak)),
+			DuelRank = if previous then previous.DuelRank else 0,
+		}
+		render(player)
+	end)
+
+	dataManager.DuelRankChanged:Connect(function(player: Player, duelRank: number)
+		local previous = cachedStats[player]
+		cachedStats[player] = {
+			Wins = if previous then previous.Wins else 0,
+			Streak = if previous then previous.Streak else 0,
+			DuelRank = math.max(0, math.floor(duelRank)),
 		}
 		render(player)
 	end)
