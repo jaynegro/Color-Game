@@ -1,6 +1,7 @@
 --!strict
 local controllers = script.Parent:WaitForChild("Controllers")
 
+local AFKController = require(controllers:WaitForChild("AFKController"))
 local BoardController = require(controllers:WaitForChild("BoardController"))
 local CameraShakeController = require(controllers:WaitForChild("CameraShakeController"))
 local CmdrController = require(controllers:WaitForChild("CmdrController"))
@@ -53,6 +54,7 @@ end
 initController("NotificationController", NotificationController, false)
 
 local independentControllers: { { Name: string, Controller: any } } = {
+	{ Name = "AFKController", Controller = AFKController },
 	{ Name = "VIPSeatController", Controller = VIPSeatController },
 	{ Name = "CameraShakeController", Controller = CameraShakeController },
 	{ Name = "CmdrController", Controller = CmdrController },
