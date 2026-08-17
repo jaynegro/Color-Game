@@ -3,7 +3,7 @@
 return table.freeze({
 	PickingDuration = 10,
 	DayCycleDuration = 10 * 60,
-	RagdollEnabled = false,
+	RagdollEnabled = true,
 	VIPWinMultiplier = 2,
 	RoundCameraEnabled = true,
 	DuelTargetScore = 20,
